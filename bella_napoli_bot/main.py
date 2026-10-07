@@ -99,6 +99,7 @@ async def _show_home(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    logger.info("Получена команда /start")
     context.user_data.clear()
     await _show_home(update, context)
     return ConversationHandler.END
@@ -561,6 +562,7 @@ async def set_commands(application: Application) -> None:
             BotCommand("admin", "Последние заказы и бронирования"),
         ]
     )
+    logger.info("Подключён Telegram-бот @%s", application.bot.username)
 
 
 async def show_menu_command(
