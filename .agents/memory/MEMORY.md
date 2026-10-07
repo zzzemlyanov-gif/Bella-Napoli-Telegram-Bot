@@ -1,0 +1,1 @@
+- [Python package setup](python-package-setup.md) — install a Python Tools module before adding pip dependencies in this workspace.

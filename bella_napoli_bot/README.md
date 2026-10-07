@@ -9,7 +9,8 @@ stored in SQLite.
 1. Create a Telegram bot with [@BotFather](https://t.me/BotFather).
 2. Add its token as the Replit Secret `TELEGRAM_BOT_TOKEN`.
 3. Set `ADMIN_CHAT_ID` to the numeric Telegram user/chat ID that should receive
-   order and reservation alerts. The admin should open the bot and press Start
+   order and reservation alerts (send `/start` to `@userinfobot` to look up the
+   numeric user ID). The admin should open Bella Napoli's bot and press Start
    before the bot tries to send a notification.
 4. Install dependencies from the project root:
 
