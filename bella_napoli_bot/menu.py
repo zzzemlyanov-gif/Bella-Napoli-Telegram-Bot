@@ -1,99 +1,99 @@
-"""Restaurant menu and prices. Edit this file to update the catalog."""
+"""Меню и цены ресторана. Каталог можно изменить в этом файле."""
 
 MENU = {
     "pizza": {
-        "title": "Pizza",
+        "title": "🍕 Пицца",
         "items": [
             {
                 "id": "margherita",
-                "name": "Margherita",
-                "description": "Tomato, mozzarella, fresh basil",
+                "name": "Маргарита",
+                "description": "Томаты, моцарелла, свежий базилик",
                 "price": 690,
             },
             {
                 "id": "diavola",
-                "name": "Diavola",
-                "description": "Spicy salami, mozzarella, tomato",
+                "name": "Диавола",
+                "description": "Острая салями, моцарелла, томаты",
                 "price": 850,
             },
             {
                 "id": "quattro_formaggi",
-                "name": "Quattro Formaggi",
-                "description": "Four Italian cheeses, creamy base",
+                "name": "Кватро Формаджи",
+                "description": "Четыре итальянских сыра на сливочной основе",
                 "price": 890,
             },
         ],
     },
     "pasta": {
-        "title": "Pasta",
+        "title": "🍝 Паста",
         "items": [
             {
                 "id": "carbonara",
-                "name": "Carbonara",
-                "description": "Guanciale, egg yolk, pecorino, black pepper",
+                "name": "Карбонара",
+                "description": "Гуанчале, яичный желток, пекорино, чёрный перец",
                 "price": 720,
             },
             {
                 "id": "bolognese",
-                "name": "Tagliatelle Bolognese",
-                "description": "Slow-cooked beef and tomato ragù",
+                "name": "Тальятелле болоньезе",
+                "description": "Тушёная говядина в томатном соусе рагу",
                 "price": 760,
             },
             {
                 "id": "pomodoro",
-                "name": "Penne al Pomodoro",
-                "description": "Penne, San Marzano tomato, basil",
+                "name": "Пенне аль помодоро",
+                "description": "Пенне, томаты Сан-Марцано, базилик",
                 "price": 590,
             },
         ],
     },
     "antipasti": {
-        "title": "Starters",
+        "title": "🥗 Закуски",
         "items": [
             {
                 "id": "bruschetta",
-                "name": "Tomato Bruschetta",
-                "description": "Grilled sourdough, tomato, basil, olive oil",
+                "name": "Брускетта с томатами",
+                "description": "Поджаренный хлеб, томаты, базилик, оливковое масло",
                 "price": 390,
             },
             {
                 "id": "caprese",
-                "name": "Caprese Salad",
-                "description": "Tomato, mozzarella, basil, balsamic",
+                "name": "Салат «Капрезе»",
+                "description": "Томаты, моцарелла, базилик, бальзамический соус",
                 "price": 550,
             },
         ],
     },
     "dessert": {
-        "title": "Desserts",
+        "title": "🍰 Десерты",
         "items": [
             {
                 "id": "tiramisu",
-                "name": "Tiramisu",
-                "description": "Espresso-soaked savoiardi, mascarpone, cocoa",
+                "name": "Тирамису",
+                "description": "Савоярди с эспрессо, маскарпоне, какао",
                 "price": 420,
             },
             {
                 "id": "panna_cotta",
-                "name": "Panna Cotta",
-                "description": "Vanilla cream with berry sauce",
+                "name": "Панна-котта",
+                "description": "Ванильный сливочный десерт с ягодным соусом",
                 "price": 390,
             },
         ],
     },
     "drinks": {
-        "title": "Drinks",
+        "title": "🥤 Напитки",
         "items": [
             {
                 "id": "lemonade",
-                "name": "House Lemonade",
-                "description": "Fresh lemon, mint, sparkling water",
+                "name": "Домашний лимонад",
+                "description": "Свежий лимон, мята, газированная вода",
                 "price": 250,
             },
             {
                 "id": "espresso",
-                "name": "Espresso",
-                "description": "Classic Italian espresso",
+                "name": "Эспрессо",
+                "description": "Классический итальянский эспрессо",
                 "price": 180,
             },
         ],

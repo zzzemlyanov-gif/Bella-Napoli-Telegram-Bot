@@ -21,7 +21,7 @@ class RestaurantDBTests(unittest.TestCase):
         cart = self.db.get_cart(101)
         self.assertEqual(len(cart), 1)
         self.assertEqual(cart[0]["quantity"], 3)
-        self.assertEqual(cart[0]["name"], "Margherita")
+        self.assertEqual(cart[0]["name"], "Маргарита")
 
         self.db.set_cart_quantity(101, "margherita", 1)
         self.assertEqual(self.db.get_cart(101)[0]["quantity"], 1)

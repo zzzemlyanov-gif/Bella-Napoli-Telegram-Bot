@@ -41,6 +41,7 @@ logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger("bella_napoli_bot")
 DB = RestaurantDB(
     os.getenv("DATABASE_PATH")
@@ -65,8 +66,8 @@ def _valid_phone(value: str) -> bool:
 
 def _format_cart(items: list[dict[str, Any]]) -> tuple[str, int]:
     if not items:
-        return "Your cart is empty. Browse the menu to add something delicious.", 0
-    lines = ["🛒 <b>Your Bella Napoli cart</b>", ""]
+        return "🛒 Корзина пуста. Откройте меню и добавьте любимые блюда.", 0
+    lines = ["🛒 <b>Корзина Bella Napoli</b>", ""]
     subtotal = 0
     for item in items:
         line_total = item["price"] * item["quantity"]
@@ -74,7 +75,7 @@ def _format_cart(items: list[dict[str, Any]]) -> tuple[str, int]:
         lines.append(
             f"• {item['name']} × {item['quantity']} — {money(line_total)}"
         )
-    lines.extend(["", f"<b>Subtotal: {money(subtotal)}</b>"])
+    lines.extend(["", f"<b>Сумма блюд: {money(subtotal)}</b>"])
     return "\n".join(lines), subtotal
 
 
@@ -90,8 +91,8 @@ async def _show_home(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     message = update.effective_message
     if message:
         await message.reply_text(
-            "Welcome to <b>Bella Napoli</b>!\n"
-            "Italian favorites, made with care. What would you like to do?",
+            "Добро пожаловать в <b>Bella Napoli</b>!\n"
+            "Итальянские блюда с заботой о каждом госте. Что выберете?",
             parse_mode="HTML",
             reply_markup=home_keyboard(),
         )
@@ -109,7 +110,7 @@ async def cancel_command(
     context.user_data.clear()
     if update.effective_message:
         await update.effective_message.reply_text(
-            "That request has been cancelled.", reply_markup=home_keyboard()
+            "Действие отменено.", reply_markup=home_keyboard()
         )
     return ConversationHandler.END
 
@@ -121,7 +122,7 @@ async def cancel_flow_callback(
     if query:
         await query.answer()
         await query.edit_message_text(
-            "That request has been cancelled.", reply_markup=home_keyboard()
+            "Действие отменено.", reply_markup=home_keyboard()
         )
     context.user_data.clear()
     return ConversationHandler.END
@@ -133,27 +134,37 @@ async def handle_navigation(
     query = update.callback_query
     if not query:
         return
-    await query.answer()
     data = query.data or ""
+
+    if data.startswith("add:"):
+        item_id = data.split(":", 1)[1]
+        if item_id not in ITEMS_BY_ID or not update.effective_user:
+            await query.answer("⚠️ Это блюдо больше недоступно.", show_alert=True)
+            return
+        _db().add_to_cart(update.effective_user.id, item_id)
+        await query.answer("✅ Добавлено в корзину")
+        return
+
+    await query.answer()
 
     if data == "home":
         context.user_data.clear()
         await query.edit_message_text(
-            "Welcome to <b>Bella Napoli</b>!\n"
-            "Italian favorites, made with care. What would you like to do?",
+            "Добро пожаловать в <b>Bella Napoli</b>!\n"
+            "Итальянские блюда с заботой о каждом госте. Что выберете?",
             parse_mode="HTML",
             reply_markup=home_keyboard(),
         )
     elif data == "menu":
         await query.edit_message_text(
-            "<b>Bella Napoli menu</b>\nChoose a category:",
+            "<b>Меню Bella Napoli</b>\nВыберите категорию:",
             parse_mode="HTML",
             reply_markup=categories_keyboard(),
         )
     elif data.startswith("cat:"):
         category_id = data.split(":", 1)[1]
         if category_id not in MENU:
-            await query.edit_message_text("That menu category is unavailable.")
+            await query.edit_message_text("⚠️ Эта категория сейчас недоступна.")
             return
         category = MENU[category_id]
         lines = [f"<b>{category['title']}</b>", ""]
@@ -167,12 +178,6 @@ async def handle_navigation(
             parse_mode="HTML",
             reply_markup=category_keyboard(category_id),
         )
-    elif data.startswith("add:"):
-        item_id = data.split(":", 1)[1]
-        if item_id not in ITEMS_BY_ID or not update.effective_user:
-            await query.edit_message_text("That item is no longer available.")
-            return
-        _db().add_to_cart(update.effective_user.id, item_id)
     elif data == "cart":
         if not update.effective_user:
             return
@@ -225,14 +230,14 @@ async def begin_delivery(
     items = _db().get_cart(update.effective_user.id)
     if not items:
         await query.edit_message_text(
-            "Your cart is empty. Browse the menu first.",
+            "🛒 Корзина пуста. Сначала выберите блюда в меню.",
             reply_markup=categories_keyboard(),
         )
         return ConversationHandler.END
     context.user_data["order_items"] = items
     context.user_data.pop("flow", None)
     await query.edit_message_text(
-        "Please send your full delivery address, including apartment or entrance details.",
+        "📍 Отправьте адрес доставки: улицу, дом, подъезд и номер квартиры.",
         reply_markup=cancel_keyboard(),
     )
     return ADDRESS
@@ -246,12 +251,12 @@ async def receive_address(
     address = (update.effective_message.text or "").strip()
     if len(address) < 8 or len(address) > 300:
         await update.effective_message.reply_text(
-            "Please send a complete address (8–300 characters)."
+            "⚠️ Укажите полный адрес доставки (от 8 до 300 символов)."
         )
         return ADDRESS
     context.user_data["delivery_address"] = address
     await update.effective_message.reply_text(
-        "What phone number should the courier use to contact you?"
+        "📞 На какой номер телефона курьеру связаться с вами?"
     )
     return ORDER_PHONE
 
@@ -264,7 +269,7 @@ async def receive_order_phone(
     phone = (update.effective_message.text or "").strip()
     if not _valid_phone(phone):
         await update.effective_message.reply_text(
-            "Please enter a valid phone number with 7–15 digits."
+            "⚠️ Введите корректный номер телефона: от 7 до 15 цифр."
         )
         return ORDER_PHONE
     context.user_data["delivery_phone"] = phone
@@ -272,14 +277,14 @@ async def receive_order_phone(
     _, subtotal = _format_cart(items)
     total = subtotal + DELIVERY_FEE
     summary = (
-        "<b>Confirm your delivery order</b>\n\n"
+        "🧾 <b>Проверьте заказ перед подтверждением</b>\n\n"
         f"{_format_order_items(items)}\n\n"
-        f"Subtotal: {money(subtotal)}\n"
-        f"Delivery: {money(DELIVERY_FEE)}\n"
-        f"<b>Total: {money(total)}</b>\n\n"
-        f"Address: {escape(context.user_data['delivery_address'])}\n"
-        f"Phone: {escape(phone)}\n\n"
-        "Payment is arranged with the restaurant on delivery."
+        f"Сумма блюд: {money(subtotal)}\n"
+        f"🚚 Доставка: {money(DELIVERY_FEE)}\n"
+        f"<b>Итого с доставкой: {money(total)}</b>\n\n"
+        f"📍 Адрес: {escape(context.user_data['delivery_address'])}\n"
+        f"📞 Телефон: {escape(phone)}\n\n"
+        "Оплату можно согласовать с рестораном при доставке."
     )
     await update.effective_message.reply_text(
         summary,
@@ -300,7 +305,7 @@ async def confirm_order(
     if query.data == "order:cancel":
         context.user_data.clear()
         await query.edit_message_text(
-            "Order cancelled. Your cart is still saved.", reply_markup=home_keyboard()
+            "Заказ отменён, товары остались в корзине.", reply_markup=home_keyboard()
         )
         return ConversationHandler.END
 
@@ -308,7 +313,7 @@ async def confirm_order(
     if not items:
         context.user_data.clear()
         await query.edit_message_text(
-            "Your cart is empty, so no order was placed.",
+            "🛒 Корзина пуста — заказ не оформлен.",
             reply_markup=home_keyboard(),
         )
         return ConversationHandler.END
@@ -324,23 +329,23 @@ async def confirm_order(
         delivery_fee=DELIVERY_FEE,
     )
     await query.edit_message_text(
-        f"Thank you! Order <b>#{order_id}</b> has been sent to Bella Napoli. "
-        "The restaurant will contact you to confirm delivery.",
+        f"✅ Спасибо! Заказ <b>№{order_id}</b> отправлен в Bella Napoli. "
+        "Ресторан свяжется с вами для подтверждения доставки.",
         parse_mode="HTML",
         reply_markup=home_keyboard(),
     )
     await notify_admin(
         context,
-        "<b>New delivery order</b>\n"
-        f"Order: #{order_id}\n"
-        f"Customer: {escape(user.full_name)} "
-        f"({escape(_username(update) or 'no username')})\n"
-        f"Phone: {escape(context.user_data['delivery_phone'])}\n"
-        f"Address: {escape(context.user_data['delivery_address'])}\n\n"
+        "🛵 <b>Новый заказ с доставкой</b>\n"
+        f"Заказ: №{order_id}\n"
+        f"Гость: {escape(user.full_name)} "
+        f"({escape(_username(update) or 'без имени пользователя')})\n"
+        f"Телефон: {escape(context.user_data['delivery_phone'])}\n"
+        f"Адрес: {escape(context.user_data['delivery_address'])}\n\n"
         f"{_format_order_items(items)}\n\n"
-        f"Subtotal: {money(subtotal)}\n"
-        f"Delivery: {money(DELIVERY_FEE)}\n"
-        f"<b>Total: {money(subtotal + DELIVERY_FEE)}</b>",
+        f"Сумма блюд: {money(subtotal)}\n"
+        f"Доставка: {money(DELIVERY_FEE)}\n"
+        f"<b>Итого с доставкой: {money(subtotal + DELIVERY_FEE)}</b>",
     )
     context.user_data.clear()
     return ConversationHandler.END
@@ -355,8 +360,8 @@ async def begin_reservation(
     await query.answer()
     context.user_data.clear()
     await query.edit_message_text(
-        "What date would you like to visit? Please use YYYY-MM-DD "
-        "(for example, 2026-10-20).",
+        "🗓 На какую дату забронировать столик? Введите ГГГГ-ММ-ДД "
+        "(например, 2026-10-20).",
         reply_markup=cancel_keyboard(),
     )
     return RES_DATE
@@ -370,14 +375,17 @@ async def receive_reservation_date(
     try:
         requested = date.fromisoformat((update.effective_message.text or "").strip())
     except ValueError:
-        await update.effective_message.reply_text("Use YYYY-MM-DD, for example 2026-10-20.")
+        await update.effective_message.reply_text(
+            "⚠️ Укажите дату в формате ГГГГ-ММ-ДД, например 2026-10-20."
+        )
         return RES_DATE
     if requested < date.today():
-        await update.effective_message.reply_text("Please choose today or a future date.")
+        await update.effective_message.reply_text("⚠️ Выберите сегодняшнюю или будущую дату.")
         return RES_DATE
     context.user_data["reservation_date"] = requested.isoformat()
     await update.effective_message.reply_text(
-        "What time would you like? Use 24-hour HH:MM (for example, 19:30)."
+        "🕒 На какое время забронировать? Укажите время в формате 24 часа, ЧЧ:ММ "
+        "(например, 19:30)."
     )
     return RES_TIME
 
@@ -391,11 +399,13 @@ async def receive_reservation_time(
     try:
         parsed = datetime.strptime(raw_time, "%H:%M")
     except ValueError:
-        await update.effective_message.reply_text("Please use 24-hour HH:MM, for example 19:30.")
+        await update.effective_message.reply_text(
+            "⚠️ Укажите время в формате ЧЧ:ММ, например 19:30."
+        )
         return RES_TIME
     context.user_data["reservation_time"] = parsed.strftime("%H:%M")
     await update.effective_message.reply_text(
-        "How many guests?",
+        "👥 Сколько будет гостей?",
         reply_markup=reservation_guests_keyboard(),
     )
     return RES_GUESTS
@@ -411,13 +421,13 @@ async def receive_reservation_guests(
     try:
         guests = int((query.data or "").rsplit(":", 1)[1])
     except (IndexError, ValueError):
-        await query.edit_message_text("Please choose between 1 and 12 guests.")
+        await query.edit_message_text("⚠️ Выберите количество гостей от 1 до 12.")
         return RES_GUESTS
     if not 1 <= guests <= 12:
-        await query.edit_message_text("Please choose between 1 and 12 guests.")
+        await query.edit_message_text("⚠️ Выберите количество гостей от 1 до 12.")
         return RES_GUESTS
     context.user_data["guests"] = guests
-    await query.edit_message_text("What name should we put the reservation under?")
+    await query.edit_message_text("👤 На чьё имя оформить бронирование?")
     return RES_NAME
 
 
@@ -428,10 +438,12 @@ async def receive_reservation_name(
         return RES_NAME
     name = (update.effective_message.text or "").strip()
     if not 2 <= len(name) <= 100:
-        await update.effective_message.reply_text("Please send a name between 2 and 100 characters.")
+        await update.effective_message.reply_text(
+            "⚠️ Введите имя длиной от 2 до 100 символов."
+        )
         return RES_NAME
     context.user_data["reservation_name"] = name
-    await update.effective_message.reply_text("What phone number can we contact you on?")
+    await update.effective_message.reply_text("📞 На какой номер телефона с вами связаться?")
     return RES_PHONE
 
 
@@ -443,7 +455,7 @@ async def receive_reservation_phone(
     phone = (update.effective_message.text or "").strip()
     if not _valid_phone(phone):
         await update.effective_message.reply_text(
-            "Please enter a valid phone number with 7–15 digits."
+            "⚠️ Введите корректный номер телефона: от 7 до 15 цифр."
         )
         return RES_PHONE
     user = update.effective_user
@@ -457,21 +469,21 @@ async def receive_reservation_phone(
         guests=context.user_data["guests"],
     )
     await update.effective_message.reply_text(
-        f"Thank you! Reservation request <b>#{reservation_id}</b> has been sent "
-        "to Bella Napoli. We’ll contact you to confirm.",
+        f"✅ Заявка на бронирование <b>№{reservation_id}</b> отправлена в Bella Napoli. "
+        "Мы свяжемся с вами для подтверждения.",
         parse_mode="HTML",
         reply_markup=home_keyboard(),
     )
     await notify_admin(
         context,
-        "<b>New table reservation</b>\n"
-        f"Request: #{reservation_id}\n"
-        f"Name: {escape(context.user_data['reservation_name'])}\n"
-        f"Phone: {escape(phone)}\n"
-        f"Date: {context.user_data['reservation_date']}\n"
-        f"Time: {context.user_data['reservation_time']}\n"
-        f"Guests: {context.user_data['guests']}\n"
-        f"Telegram: {_username(update) or user.id}",
+        "🪑 <b>Новая заявка на бронирование столика</b>\n"
+        f"Заявка: №{reservation_id}\n"
+        f"Имя: {escape(context.user_data['reservation_name'])}\n"
+        f"Телефон: {escape(phone)}\n"
+        f"Дата: {context.user_data['reservation_date']}\n"
+        f"Время: {context.user_data['reservation_time']}\n"
+        f"Гостей: {context.user_data['guests']}\n"
+        f"Пользователь Telegram: {escape(_username(update) or str(user.id))}",
     )
     context.user_data.clear()
     return ConversationHandler.END
@@ -482,14 +494,14 @@ async def notify_admin(
 ) -> None:
     admin_chat_id = os.getenv("ADMIN_CHAT_ID", "").strip()
     if not admin_chat_id:
-        logger.error("ADMIN_CHAT_ID is not configured; notification was not sent")
+        logger.error("ADMIN_CHAT_ID не настроен; уведомление не отправлено")
         return
     try:
         await context.bot.send_message(
             chat_id=int(admin_chat_id), text=text, parse_mode="HTML"
         )
     except (ValueError, TelegramError):
-        logger.exception("Could not send a notification to the configured admin chat")
+        logger.exception("Не удалось отправить уведомление в чат администратора")
 
 
 async def admin_command(
@@ -500,28 +512,40 @@ async def admin_command(
     configured_admin = os.getenv("ADMIN_CHAT_ID", "").strip()
     if not user or not message or not configured_admin or str(user.id) != configured_admin:
         if message:
-            await message.reply_text("This command is for restaurant staff only.")
+            await message.reply_text("⛔ Команда доступна только сотрудникам ресторана.")
         return ConversationHandler.END
 
     orders = _db().get_recent_orders(5)
     reservations = _db().get_recent_reservations(5)
-    lines = ["<b>Recent delivery orders</b>"]
+    lines = ["🛵 <b>Последние заказы с доставкой</b>"]
     if not orders:
-        lines.append("No orders yet.")
+        lines.append("Заказов пока нет.")
     for order in orders:
+        status = {
+            "new": "Новый",
+            "confirmed": "Подтверждён",
+            "cancelled": "Отменён",
+            "done": "Выполнен",
+        }.get(order["status"], order["status"])
         lines.append(
             f"#{order['id']} · {escape(order['customer_name'])} · "
             f"{money(order['total'])} · "
-            f"{order['status']} · {order['created_at']}"
+            f"{status} · {order['created_at']}"
         )
-    lines.extend(["", "<b>Recent reservations</b>"])
+    lines.extend(["", "🪑 <b>Последние бронирования</b>"])
     if not reservations:
-        lines.append("No reservations yet.")
+        lines.append("Заявок на бронирование пока нет.")
     for reservation in reservations:
+        status = {
+            "new": "Новая",
+            "confirmed": "Подтверждена",
+            "cancelled": "Отменена",
+            "done": "Завершена",
+        }.get(reservation["status"], reservation["status"])
         lines.append(
             f"#{reservation['id']} · {escape(reservation['customer_name'])} · "
             f"{reservation['reservation_date']} {reservation['reservation_time']} · "
-            f"{reservation['guests']} guests · {reservation['status']}"
+            f"{reservation['guests']} гост. · {status}"
         )
     await message.reply_text("\n".join(lines), parse_mode="HTML")
     return ConversationHandler.END
@@ -530,11 +554,11 @@ async def admin_command(
 async def set_commands(application: Application) -> None:
     await application.bot.set_my_commands(
         [
-            BotCommand("start", "Open the Bella Napoli menu"),
-            BotCommand("menu", "Browse the restaurant menu"),
-            BotCommand("cart", "View your shopping cart"),
-            BotCommand("cancel", "Cancel the current request"),
-            BotCommand("admin", "View recent orders and reservations"),
+            BotCommand("start", "Открыть главное меню Bella Napoli"),
+            BotCommand("menu", "Посмотреть меню ресторана"),
+            BotCommand("cart", "Открыть корзину"),
+            BotCommand("cancel", "Отменить текущее действие"),
+            BotCommand("admin", "Последние заказы и бронирования"),
         ]
     )
 
@@ -545,7 +569,7 @@ async def show_menu_command(
     context.user_data.clear()
     if update.effective_message:
         await update.effective_message.reply_text(
-            "<b>Bella Napoli menu</b>\nChoose a category:",
+            "<b>Меню Bella Napoli</b>\nВыберите категорию:",
             parse_mode="HTML",
             reply_markup=categories_keyboard(),
         )
@@ -639,18 +663,19 @@ def main() -> None:
     admin_chat_id = os.getenv("ADMIN_CHAT_ID", "").strip()
     if not token:
         raise SystemExit(
-            "TELEGRAM_BOT_TOKEN is required. Add your bot token in Replit Secrets."
+            "Не задан TELEGRAM_BOT_TOKEN. Добавьте токен бота в секреты Replit."
         )
     if not admin_chat_id:
         raise SystemExit(
-            "ADMIN_CHAT_ID is required. Set it to the Telegram account ID that receives restaurant alerts."
+            "Не задан ADMIN_CHAT_ID. Укажите Telegram ID сотрудника, "
+            "который будет получать уведомления ресторана."
         )
     try:
         int(admin_chat_id)
     except ValueError as error:
-        raise SystemExit("ADMIN_CHAT_ID must be a numeric Telegram chat ID.") from error
+        raise SystemExit("ADMIN_CHAT_ID должен содержать числовой Telegram ID.") from error
 
-    logger.info("Starting Bella Napoli Telegram bot")
+    logger.info("Запуск Telegram-бота Bella Napoli")
     build_application(token).run_polling(drop_pending_updates=True)
 
 
